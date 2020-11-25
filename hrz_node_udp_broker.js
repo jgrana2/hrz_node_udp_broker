@@ -1,72 +1,129 @@
-//Horizon Medical Node UDP Broker
+/* Copyright HORIZON MEDICAL S.A.S 2020 www.horizonmedical.co */
+// Horizon Medical Node UDP Broker
 
-const udp = require('dgram')
-const conf = require('./config')
-const server = udp.createSocket('udp4')
-var ip = require('ip');
-var MongoClient = require('mongodb').MongoClient;
-const log = require('cllc')();
-log.dateFormat('%F %T %z');
+// UDP Server
+const hzm_udp = require('dgram')
+const hzm_conf = require('./config')
+const hzm_udp_server = hzm_udp.createSocket('udp4')
+const hzm_channel_buffer_size = 169
+
+// Get IP
+var ip = require('ip')
+
+// Database
+const {
+  MongoClient
+} = require("mongodb")
+const hzm_url = "mongodb://localhost:27017/?useUnifiedTopology=true"
+const hzm_db_name = 'IoTEKGSignalDb'
+const hzm_device_id = "device1"
+const hzm_collection_name = hzm_device_id
+
+// Logger
+const log = require('cllc')()
+log.dateFormat('%F %T %z')
+
+// Application global variables
+var hzm_preaggregate_counter = 0
+var hzm_preaggregate_factor = 10
+var hzm_preaggregate_channel_1_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var hzm_preaggregate_channel_2_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var hzm_preaggregate_channel_3_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var hzm_preaggregate_channel_4_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var hzm_preaggregate_channel_5_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var hzm_preaggregate_channel_6_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var hzm_preaggregate_channel_7_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var hzm_preaggregate_channel_8_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+
+// Create a new MongoClient
+const hzm_mongo_client = new MongoClient(hzm_url);
 
 // Connect to the db
-MongoClient.connect("mongodb://localhost:27017/IoTEKGSignalDb", { useUnifiedTopology: true },function(err, db) {
-  if(!err) {
-    log.info("DB connected");
+async function connect_to_db() {
+  try {
+    await hzm_mongo_client.connect();
+    await hzm_mongo_client.db(hzm_db_name).command({
+      ping: 1
+    });
+    log.info("Connected successfully to database server")
+  } catch (error) {
+    log.error(error.message)
+    await hzm_mongo_client.close()
   }
-});
+}
+connect_to_db().catch(console.dir)
 
 // On error, log and close server
-server.on('error', (error) => {
-    log.info("udp_server", "error", error)
-    server.close()
+hzm_udp_server.on('error', (error) => {
+  log.info("udp_server", "error", error)
+  hzm_udp_server.close()
 })
 
 // On new UDP message, print received data
-log.start('Messages received: %s', 0);
-server.on('message', (msg,info) => {
-    log.step();
-    log.info(msg.toString('hex') + ` | Received ${msg.length} bytes from ${info.address}:${info.port}`)
+log.start('Messages received: %s', 0)
 
-    // Respond
-    // let timestp = new Date()
-    // const response = {
-    //     description: 'UDP PORT TEST',
-    //     serverPort: conf.port,
-    //     timestamp: timestp.toJSON(),
-    //     received: {
-    //         message: msg.toString(),
-    //         fromIP: info.address,
-    //         fromPort: info.port
-    //     }
-    // }
-    // const data = Buffer.from(JSON.stringify(response))
-    //
-    // server.send(data, info.port, info.address, (error, bytes) => {
-    //     if(error){
-    //         log.info("udp_server", "error", error)
-    //         client.close()
-    //     } else {
-    //         log.info("udp_server", "info", 'Data sent')
-    //     }
-    // })
-})  // end server.on
+// On message received, preaggregate and save in database
+hzm_udp_server.on('message', (msg, info) => {
+  // Log number of messages received
+  log.step()
 
-//On server ready, print info
-server.on('listening', () => {
-    const address = server.address()
-    const port = address.port
-    const family = address.family
-    const ipaddr = ip.address()
+  // Parse UDP message received
+  let hzm_channel_1_buffer = msg.slice(hzm_channel_buffer_size * 0, hzm_channel_buffer_size * 1)
+  let hzm_channel_2_buffer = msg.slice(hzm_channel_buffer_size * 1, hzm_channel_buffer_size * 2)
+  let hzm_channel_3_buffer = msg.slice(hzm_channel_buffer_size * 2, hzm_channel_buffer_size * 3)
+  let hzm_channel_4_buffer = msg.slice(hzm_channel_buffer_size * 3, hzm_channel_buffer_size * 4)
+  let hzm_channel_5_buffer = msg.slice(hzm_channel_buffer_size * 4, hzm_channel_buffer_size * 5)
+  let hzm_channel_6_buffer = msg.slice(hzm_channel_buffer_size * 5, hzm_channel_buffer_size * 6)
+  let hzm_channel_7_buffer = msg.slice(hzm_channel_buffer_size * 6, hzm_channel_buffer_size * 7)
+  let hzm_channel_8_buffer = msg.slice(hzm_channel_buffer_size * 7, hzm_channel_buffer_size * 8)
 
-    log.info('Server is listening at port ' + port)
-    log.info('Server ' + family + ' address: ' + ipaddr)
+  // Preaggregate channel buffers
+  hzm_channel_1_buffer.copy(hzm_preaggregate_channel_1_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_channel_2_buffer.copy(hzm_preaggregate_channel_2_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_channel_3_buffer.copy(hzm_preaggregate_channel_3_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_channel_4_buffer.copy(hzm_preaggregate_channel_4_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_channel_5_buffer.copy(hzm_preaggregate_channel_5_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_channel_6_buffer.copy(hzm_preaggregate_channel_6_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_channel_7_buffer.copy(hzm_preaggregate_channel_7_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_channel_8_buffer.copy(hzm_preaggregate_channel_8_buffer, hzm_preaggregate_counter * hzm_channel_buffer_size, 1)
+  hzm_preaggregate_counter++
+
+  // Save in database
+  if (hzm_preaggregate_counter >= hzm_preaggregate_factor) {
+    // Make document
+    let doc = {}
+    doc.ts = new Date()
+    doc.channel1 = hzm_preaggregate_channel_1_buffer
+    doc.channel2 = hzm_preaggregate_channel_2_buffer
+    doc.channel3 = hzm_preaggregate_channel_3_buffer
+    doc.channel4 = hzm_preaggregate_channel_4_buffer
+    doc.channel5 = hzm_preaggregate_channel_5_buffer
+    doc.channel6 = hzm_preaggregate_channel_6_buffer
+    doc.channel7 = hzm_preaggregate_channel_7_buffer
+    doc.channel8 = hzm_preaggregate_channel_8_buffer
+    log.info(doc)
+
+    // Insert document into DB
+    hzm_mongo_client.db(hzm_db_name).collection("device1").insertOne(doc, function(err, res) {
+      if (err) throw err
+      log.info("Document inserted")
+    });
+    hzm_preaggregate_counter = 0
+  }
 })
 
-//On server close, log info
-server.on('close', () => {
-    log.stop();
-    log.info("udp_server", "info", 'Socket is closed !')
+// On server ready, print info
+hzm_udp_server.on('listening', () => {
+  const address = hzm_udp_server.address()
+  log.info('Server is listening at port ' + address.port)
+  log.info('Server ' + address.family + ' address: ' + ip.address())
 })
 
-//Listen for datagram messages on a named port
-server.bind(conf.port)
+// On server close, log info
+hzm_udp_server.on('close', () => {
+  log.stop();
+  log.info("udp_server", "info", 'Socket is closed !')
+})
+
+// Listen for datagram messages on a named port
+hzm_udp_server.bind(hzm_conf.port)
