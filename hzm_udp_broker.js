@@ -19,13 +19,17 @@ const hzm_db_name = 'IoTEKGSignalDb'
 const hzm_device_id = "device1"
 const hzm_collection_name = hzm_device_id
 
+// Socket.io server
+const io = require("socket.io")();
+io.listen(hzm_conf.socket_io_port);
+
 // Logger
 const log = require('cllc')()
 log.dateFormat('%F %T %z')
 
 // Application global variables
 var hzm_preaggregate_counter = 0
-var hzm_preaggregate_factor = 10
+var hzm_preaggregate_factor = 30
 var hzm_preaggregate_channel_1_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
 var hzm_preaggregate_channel_2_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
 var hzm_preaggregate_channel_3_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
@@ -35,10 +39,10 @@ var hzm_preaggregate_channel_6_buffer = Buffer.alloc(hzm_preaggregate_factor * h
 var hzm_preaggregate_channel_7_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
 var hzm_preaggregate_channel_8_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
 
-// Create a new MongoClient
+// Create a new mongodb client
 const hzm_mongo_client = new MongoClient(hzm_url);
 
-// Connect to the db
+// Connect to the database
 async function connect_to_db() {
   try {
     await hzm_mongo_client.connect();
@@ -46,9 +50,16 @@ async function connect_to_db() {
       ping: 1
     });
     log.info("Connected successfully to database server")
+
+    // Welcome new socket clients
+    io.on("connection", socket => {
+      log.info("Socket client", socket.id, "connected")
+    })
+
   } catch (error) {
     log.error(error.message)
     await hzm_mongo_client.close()
+    await socket_server.close()
   }
 }
 connect_to_db().catch(console.dir)
@@ -110,13 +121,16 @@ hzm_udp_server.on('message', (msg, info) => {
     });
     hzm_preaggregate_counter = 0
   }
+
+  // Broadcast to socket clients
+  io.sockets.emit("data", msg)
 })
 
 // On server ready, print info
 hzm_udp_server.on('listening', () => {
   const address = hzm_udp_server.address()
-  log.info('Server is listening at port ' + address.port)
-  log.info('Server ' + address.family + ' address: ' + ip.address())
+  log.info('UDP Server is listening at port ' + address.port)
+  log.info('UDP Server ' + address.family + ' address: ' + ip.address())
 })
 
 // On server close, log info
@@ -126,4 +140,4 @@ hzm_udp_server.on('close', () => {
 })
 
 // Listen for datagram messages on a named port
-hzm_udp_server.bind(hzm_conf.port)
+hzm_udp_server.bind(hzm_conf.udp_port)

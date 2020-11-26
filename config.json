@@ -1,6 +1,6 @@
 {
-    "serverHost": "0.0.0.0",
-    "port": 33000,
+    "udp_port": 33000,
+    "socket_io_port": 33300,
     "timeout": 10000,
     "logdir": "log/server/"
 }
