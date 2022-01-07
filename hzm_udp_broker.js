@@ -43,6 +43,7 @@ var hzm_preaggregate_channel_5_buffer = Buffer.alloc(hzm_preaggregate_factor * h
 var hzm_preaggregate_channel_6_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
 var hzm_preaggregate_channel_7_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
 var hzm_preaggregate_channel_8_buffer = Buffer.alloc(hzm_preaggregate_factor * hzm_channel_buffer_size - hzm_preaggregate_factor);
+var db_available = false;
 
 // Create a new mongodb client
 const hzm_mongo_client = new MongoClient(hzm_url);
@@ -55,19 +56,14 @@ async function connect_to_db() {
       ping: 1
     });
     log.info("Connected successfully to database server")
-
-    // Welcome new socket clients
-    io.on("connection", socket => {
-      log.info("Socket client", socket.id, "connected")
-    })
-
+    db_available = true
   } catch (error) {
+    log.error("Couldn't connect to MongoDB")
     log.error(error.message)
     await hzm_mongo_client.close()
-    await socket_server.close()
+    db_available = false
   }
 }
-connect_to_db().catch(console.dir)
 
 // On error, log and close server
 hzm_udp_server.on('error', (error) => {
@@ -120,10 +116,16 @@ hzm_udp_server.on('message', (msg, info) => {
     log.info(doc)
 
     // Insert document into DB
-    hzm_mongo_client.db(hzm_db_name).collection("device1").insertOne(doc, function(err, res) {
-      if (err) throw err
-      log.info("Document inserted")
-    });
+    if (db_available == true) {
+      try {
+        hzm_mongo_client.db(hzm_db_name).collection("device1").insertOne(doc, function (err, res) {
+          if (err) throw err
+          log.info("Document inserted")
+        });
+      } catch (e) {
+        log.error(e)
+      }
+    }
     hzm_preaggregate_counter = 0
   }
 
