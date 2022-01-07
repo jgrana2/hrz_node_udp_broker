@@ -23,6 +23,11 @@ const hzm_collection_name = hzm_device_id
 const io = require("socket.io")();
 io.listen(hzm_conf.socket_io_port);
 
+// Welcome new socket clients
+io.on("connection", socket => {
+  log.info("Socket client", socket.id, "connected")
+})
+
 // Logger
 const log = require('cllc')()
 log.dateFormat('%F %T %z')
