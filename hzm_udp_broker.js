@@ -19,7 +19,7 @@ const hzm_db_name = 'IoTEKGSignalDb'
 const hzm_device_id = "device1"
 const hzm_collection_name = hzm_device_id
 
-// Socket.io server
+// Socket.io broadcast server
 const io = require("socket.io")();
 io.listen(hzm_conf.socket_io_port);
 
