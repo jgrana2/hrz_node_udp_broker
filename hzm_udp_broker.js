@@ -7,7 +7,7 @@ const hzm_conf = require('./config')
 const hzm_udp_server = hzm_udp.createSocket('udp4')
 const hzm_channel_buffer_size = 169 // 1 byte for channel number and 84 bytes of 16-bit samples
 
-// Get IP
+// Get IP Address
 var ip = require('ip')
 
 // Database
